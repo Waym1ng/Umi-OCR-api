@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR API 测试页面</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        
+        .test-section h2 {
+            color: #555;
+            margin-top: 0;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input[type="file"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .loading {
+            display: none;
+            color: #007bff;
+            font-style: italic;
+        }
+        
+        .image-preview {
+            max-width: 300px;
+            max-height: 200px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.online {
+            background-color: #28a745;
+        }
+        
+        .status-indicator.offline {
+            background-color: #dc3545;
+        }
+        
+        .status-text {
+            font-weight: bold;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tab.active {
+            border-bottom-color: #007bff;
+            color: #007bff;
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 OCR API 测试页面</h1>
+        
+        <!-- 服务状态检查 -->
+        <div class="test-section">
+            <h2>📡 服务状态</h2>
+            <button onclick="checkHealth()">检查服务状态</button>
+            <div id="healthStatus"></div>
+            <div id="optionsStatus"></div>
+        </div>
+        
+        <!-- 功能测试标签页 -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('upload')">📁 文件上传</button>
+            <button class="tab" onclick="switchTab('base64')">📝 Base64上传</button>
+        </div>
+        
+        <!-- 文件上传测试 -->
+        <div id="upload-tab" class="tab-content active">
+            <div class="test-section">
+                <h2>📁 文件上传测试</h2>
+                
+                <div class="form-group">
+                    <label for="imageFile">选择图片文件：</label>
+                    <input type="file" id="imageFile" accept="image/*" onchange="previewImage(this)">
+                    <img id="imagePreview" class="image-preview" style="display: none;">
+                </div>
+                
+                <div class="form-group">
+                    <label for="uploadLanguage">语言模型：</label>
+                    <select id="uploadLanguage">
+                        <option value="">默认</option>
+                        <option value="models/config_chinese.txt">简体中文</option>
+                        <option value="models/config_en.txt">English</option>
+                        <option value="models/config_chinese_cht(v2).txt">繁體中文</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="uploadFormat">返回格式：</label>
+                    <select id="uploadFormat">
+                        <option value="dict">详细格式 (dict)</option>
+                        <option value="text">纯文本 (text)</option>
+                    </select>
+                </div>
+                
+                <button onclick="testFileUpload()">🚀 开始识别</button>
+                <span class="loading" id="uploadLoading">正在处理中...</span>
+                
+                <div id="uploadResult" class="result" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <!-- Base64上传测试 -->
+        <div id="base64-tab" class="tab-content">
+            <div class="test-section">
+                <h2>📝 Base64上传测试</h2>
+                
+                <div class="form-group">
+                    <label for="base64Input">Base64图片数据：</label>
+                    <textarea id="base64Input" placeholder="请输入base64编码的图片数据（不需要data:image前缀）"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="base64Language">语言模型：</label>
+                    <select id="base64Language">
+                        <option value="">默认</option>
+                        <option value="models/config_chinese.txt">简体中文</option>
+                        <option value="models/config_en.txt">English</option>
+                        <option value="models/config_chinese_cht(v2).txt">繁體中文</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="base64Format">返回格式：</label>
+                    <select id="base64Format">
+                        <option value="dict">详细格式 (dict)</option>
+                        <option value="text">纯文本 (text)</option>
+                    </select>
+                </div>
+                
+                <button onclick="testBase64Upload()">🚀 开始识别</button>
+                <button onclick="loadSampleImage()">📷 加载示例图片</button>
+                <span class="loading" id="base64Loading">正在处理中...</span>
+                
+                <div id="base64Result" class="result" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.16.228:8000';
+        
+        // 标签页切换
+        function switchTab(tabName) {
+            // 隐藏所有标签内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 显示选中的标签
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        // 图片预览
+        function previewImage(input) {
+            const preview = document.getElementById('imagePreview');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        // 检查服务健康状态
+        async function checkHealth() {
+            const statusDiv = document.getElementById('healthStatus');
+            const optionsDiv = document.getElementById('optionsStatus');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'healthy') {
+                    statusDiv.innerHTML = `
+                        <div class="result success">
+                            <span class="status-indicator online"></span>
+                            <span class="status-text">API服务正常</span><br>
+                            OCR服务状态: ${data.ocr_service}
+                        </div>
+                    `;
+                    
+                    // 获取OCR选项
+                    try {
+                        const optionsResponse = await fetch(`${API_BASE}/ocr/options`);
+                        const optionsData = await optionsResponse.json();
+                        
+                        if (optionsResponse.ok) {
+                            optionsDiv.innerHTML = `
+                                <div class="result success">
+                                    <span class="status-indicator online"></span>
+                                    <span class="status-text">OCR参数获取成功</span><br>
+                                    可用参数数量: ${Object.keys(optionsData.options || {}).length}
+                                </div>
+                            `;
+                        }
+                    } catch (e) {
+                        optionsDiv.innerHTML = `
+                            <div class="result error">
+                                获取OCR参数失败: ${e.message}
+                            </div>
+                        `;
+                    }
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="result error">
+                            <span class="status-indicator offline"></span>
+                            <span class="status-text">服务异常</span><br>
+                            ${JSON.stringify(data, null, 2)}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="result error">
+                        <span class="status-indicator offline"></span>
+                        <span class="status-text">无法连接到API服务</span><br>
+                        错误: ${error.message}<br>
+                        请确保API服务在 http://192.168.16.228:8000 运行
+                    </div>
+                `;
+            }
+        }
+        
+        // 文件上传测试
+        async function testFileUpload() {
+            const fileInput = document.getElementById('imageFile');
+            const language = document.getElementById('uploadLanguage').value;
+            const format = document.getElementById('uploadFormat').value;
+            const loading = document.getElementById('uploadLoading');
+            const resultDiv = document.getElementById('uploadResult');
+            
+            if (!fileInput.files[0]) {
+                alert('请选择图片文件');
+                return;
+            }
+            
+            loading.style.display = 'inline';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                
+                if (language) {
+                    formData.append('ocr.language', language);
+                }
+                formData.append('data.format', format);
+                
+                const response = await fetch(`${API_BASE}/ocr/recognize`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                let data;
+                let displayText;
+                
+                // 根据返回格式处理响应
+                if (format === 'text' && response.ok) {
+                    // 纯文本格式，直接返回文本
+                    data = await response.text();
+                    displayText = data; // 直接显示纯文本
+                } else {
+                    // JSON格式，解析JSON
+                    data = await response.json();
+                    displayText = JSON.stringify(data, null, 2);
+                }
+                
+                resultDiv.className = `result ${response.ok ? 'success' : 'error'}`;
+                resultDiv.textContent = displayText;
+                resultDiv.style.display = 'block';
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `请求失败: ${error.message}`;
+                resultDiv.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // Base64上传测试
+        async function testBase64Upload() {
+            const base64Input = document.getElementById('base64Input');
+            const language = document.getElementById('base64Language').value;
+            const format = document.getElementById('base64Format').value;
+            const loading = document.getElementById('base64Loading');
+            const resultDiv = document.getElementById('base64Result');
+            
+            if (!base64Input.value.trim()) {
+                alert('请输入Base64图片数据');
+                return;
+            }
+            
+            loading.style.display = 'inline';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const requestData = {
+                    base64: base64Input.value.trim()
+                };
+                
+                if (language || format !== 'dict') {
+                    requestData.options = {};
+                    if (language) requestData.options['ocr.language'] = language;
+                    if (format !== 'dict') requestData.options['data.format'] = format;
+                }
+                
+                const response = await fetch(`${API_BASE}/ocr/recognize/base64`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                let data;
+                let displayText;
+                
+                // 根据返回格式处理响应
+                if (format === 'text' && response.ok) {
+                    // 纯文本格式，直接返回文本
+                    data = await response.text();
+                    displayText = data; // 直接显示纯文本
+                } else {
+                    // JSON格式，解析JSON
+                    data = await response.json();
+                    displayText = JSON.stringify(data, null, 2);
+                }
+                
+                resultDiv.className = `result ${response.ok ? 'success' : 'error'}`;
+                resultDiv.textContent = displayText;
+                resultDiv.style.display = 'block';
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `请求失败: ${error.message}`;
+                resultDiv.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // 加载示例图片
+        function loadSampleImage() {
+            // 这是一个简单的1x1像素的红色PNG图片的base64编码
+            const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+            document.getElementById('base64Input').value = sampleBase64;
+        }
+        
+        // 页面加载时自动检查服务状态
+        window.onload = function() {
+            checkHealth();
+        };
+    </script>
+</body>
+</html>
