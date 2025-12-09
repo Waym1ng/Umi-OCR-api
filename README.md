@@ -1,17 +1,19 @@
 # Umi-OCR API 服务
 
-基于 FastAPI 的 OCR 文字识别服务，提供简洁易用的 REST API 接口，支持多种图片格式的文字识别。
+基于 FastAPI 的 OCR 文字识别服务，提供简洁易用的 REST API 接口，支持多种图片格式的文字识别。现已集成 PaddleOCR 引擎，支持双引擎架构。
 
 ## ✨ 功能特性
 
+- 🚀 **双引擎支持**：支持 Umi-OCR 和 PaddleOCR 两种识别引擎
 - 🖼️ **多格式支持**：支持 JPG、PNG、BMP、TIFF、WebP 等图片格式
 - 🌐 **RESTful API**：提供标准的 REST API 接口，易于集成
 - 📝 **多种数据格式**：支持返回详细字典格式或纯文本格式
 - 🛡️ **完善的错误处理**：详细的错误信息和异常处理机制
 - 📊 **实时日志**：完整的请求处理日志记录
-- 🔧 **灵活配置**：支持多种 OCR 参数配置
-- 📱 **Web 测试界面**：内置测试页面，方便调试
+- 🔧 **灵活配置**：支持多种 OCR 参数配置和引擎选择
+- 📱 **Web 测试界面**：内置测试页面，支持引擎对比测试
 - 🧩 **Python 客户端**：提供独立的 Python 客户端工具
+- ⚡ **GPU 加速**：PaddleOCR 引擎支持 GPU 加速识别
 
 ## 🚀 快速开始
 
@@ -19,6 +21,7 @@
 
 - Python 3.8+
 - Umi-OCR 服务（默认运行在 http://127.0.0.1:1224）
+- CUDA 环境（可选，用于 PaddleOCR GPU 加速）
 
 ### 1. 安装依赖
 
@@ -32,6 +35,18 @@ pip install -r requirements.txt
 - `python-multipart` - 文件上传支持
 - `requests` - HTTP 客户端
 - `pydantic` - 数据验证
+- `paddleocr` - PaddleOCR 引擎库
+- `pillow` - 图像处理库
+- `numpy` - 数值计算库
+
+**PaddleOCR 可选依赖：**
+```bash
+# GPU 版本（推荐）
+pip install paddlepaddle-gpu
+
+# CPU 版本
+pip install paddlepaddle
+```
 
 ### 2. 启动服务
 
@@ -63,21 +78,27 @@ python main.py
 Umi-OCR-api/
 ├── main.py                     # FastAPI 主应用文件
 ├── start.py                    # 启动脚本，包含环境检查
-├── ocr_client.py              # Python 客户端工具
+├── ocr_client.py              # Umi-OCR Python 客户端工具
 ├── ocr_example.py             # 客户端使用示例
 ├── ocr_client使用说明.md        # 客户端详细使用说明
+├── paddleocr_client.py         # PaddleOCR Python 客户端工具
+├── paddleocr_example.py        # PaddleOCR 使用示例
+├── PaddleOCR集成说明.md        # PaddleOCR 集成详细说明
+├── test_integration.py         # 集成功能测试脚本
+├── test_paddleocr_client.py   # PaddleOCR 客户端测试脚本
 ├── Umi-api文档.md              # 原始 API 文档参考
 ├── requirements.txt            # Python 依赖包列表
 ├── README.md                  # 项目文档
 ├── .gitignore                 # Git 忽略文件
 ├── models/
-│   └── ocr_models.py          # Pydantic 数据模型
+│   └── ocr_models.py          # Pydantic 数据模型（支持双引擎）
 ├── services/
-│   └── ocr_service.py         # OCR 服务调用逻辑
+│   ├── ocr_service.py         # OCR 服务调用逻辑（支持多引擎）
+│   └── paddleocr_service.py    # PaddleOCR 服务封装
 ├── utils/
 │   └── image_utils.py         # 图片处理工具
 └── static/
-    └── test.html              # Web 测试页面
+    └── test.html              # Web 测试页面（支持引擎对比）
 ```
 
 ## 🔧 API 接口详解
@@ -99,16 +120,33 @@ Umi-OCR-api/
 
 **请求参数：**
 - `file` (File): 图片文件（必需）
-- `ocr.language` (str): 语言模型（可选）
-- `ocr.cls` (bool): 纠正文本方向（可选）
-- `ocr.limit_side_len` (int): 限制图像边长（可选）
-- `tbpu.parser` (str): 排版解析方案（可选）
+- `ocr.engine` (str): OCR引擎选择，umi_ocr/paddleocr（可选，默认umi_ocr）
+- `ocr.language` (str): 语言模型（可选，仅Umi-OCR引擎）
+- `ocr.cls` (bool): 纠正文本方向（可选，仅Umi-OCR引擎）
+- `ocr.limit_side_len` (int): 限制图像边长（可选，仅Umi-OCR引擎）
+- `tbpu.parser` (str): 排版解析方案（可选，仅Umi-OCR引擎）
+- `paddleocr.device` (str): PaddleOCR设备类型，gpu/cpu（可选，仅PaddleOCR引擎）
 - `data.format` (str): 返回格式，dict/text（可选）
 
 **示例：**
 ```bash
+# 使用默认Umi-OCR引擎
 curl -X POST "http://localhost:8000/ocr/recognize" \
   -F "file=@test.jpg" \
+  -F "data.format=text"
+
+# 使用PaddleOCR引擎（GPU）
+curl -X POST "http://localhost:8000/ocr/recognize" \
+  -F "file=@test.jpg" \
+  -F "ocr.engine=paddleocr" \
+  -F "paddleocr.device=gpu" \
+  -F "data.format=text"
+
+# 使用PaddleOCR引擎（CPU）
+curl -X POST "http://localhost:8000/ocr/recognize" \
+  -F "file=@test.jpg" \
+  -F "ocr.engine=paddleocr" \
+  -F "paddleocr.device=cpu" \
   -F "data.format=text"
 ```
 
@@ -162,9 +200,9 @@ curl "http://localhost:8000/ocr/options"
 
 ### 2. Python 客户端测试
 
-项目提供了独立的 Python 客户端工具：
+项目提供了独立的 Python 客户端工具，支持双引擎：
 
-#### 基本使用
+#### Umi-OCR 客户端
 ```bash
 # 识别图片并输出到控制台
 python ocr_client.py image.jpg
@@ -176,7 +214,24 @@ python ocr_client.py --url http://localhost:8000 image.png
 python ocr_client.py --output result.txt image.jpg
 ```
 
+#### PaddleOCR 客户端
+```bash
+# 使用 PaddleOCR 识别图片（默认GPU）
+python paddleocr_client.py image.jpg
+
+# 使用 CPU 模式
+python paddleocr_client.py --device cpu image.jpg
+
+# 批量处理
+python paddleocr_client.py --batch *.jpg --output results.txt
+
+# 保存结果到文件
+python paddleocr_client.py --output result.txt image.jpg
+```
+
 #### 编程调用
+
+**Umi-OCR：**
 ```python
 from ocr_client import recognize_image_text
 
@@ -186,6 +241,19 @@ print(text_result)
 
 # 使用自定义 API 地址
 text_result = recognize_image_text("image.jpg", "http://localhost:8000")
+```
+
+**PaddleOCR：**
+```python
+from paddleocr_client import recognize_image_text
+
+# 基本用法（默认GPU）
+text_result = recognize_image_text("image.jpg")
+print(text_result)
+
+# 使用自定义 API 地址和设备
+text_result = recognize_image_text("image.jpg", "http://localhost:8000", "cpu")
+print(text_result)
 ```
 
 ### 3. 健康检查
@@ -229,12 +297,23 @@ app.add_middleware(
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `ocr.language` | `models/config_chinese.txt` | 语言/模型库 |
-| `ocr.cls` | `false` | 纠正文本方向 |
-| `ocr.limit_side_len` | `960` | 限制图像边长 |
-| `tbpu.parser` | `multi_para` | 排版解析方案 |
-| `tbpu.ignoreArea` | `[]` | 忽略区域 |
+| `ocr.engine` | `umi_ocr` | OCR引擎选择（umi_ocr/paddleocr） |
+| `ocr.language` | `models/config_chinese.txt` | 语言/模型库（仅Umi-OCR引擎） |
+| `ocr.cls` | `false` | 纠正文本方向（仅Umi-OCR引擎） |
+| `ocr.limit_side_len` | `960` | 限制图像边长（仅Umi-OCR引擎） |
+| `tbpu.parser` | `multi_para` | 排版解析方案（仅Umi-OCR引擎） |
+| `tbpu.ignoreArea` | `[]` | 忽略区域（仅Umi-OCR引擎） |
+| `paddleocr.device` | `gpu` | PaddleOCR设备类型（仅PaddleOCR引擎） |
 | `data.format` | `dict` | 数据返回格式 |
+
+### 引擎选择建议
+
+| 场景 | 推荐引擎 | 配置 |
+|------|--------|------|
+| 速度优先 | PaddleOCR | `ocr.engine=paddleocr`, `paddleocr.device=gpu` |
+| 精度优先 | Umi-OCR | `ocr.engine=umi_ocr`, 适合的语言模型 |
+| 资源受限 | PaddleOCR | `ocr.engine=paddleocr`, `paddleocr.device=cpu` |
+| 复杂排版 | Umi-OCR | `ocr.engine=umi_ocr`, `tbpu.parser=multi_para` |
 
 ## 🔍 故障排除
 
@@ -316,7 +395,7 @@ curl "http://127.0.0.1:1224/api/ocr/get_options"
 2024-01-01 12:00:02 - __main__ - INFO - OCR API服务启动
 ```
 
-## 📝 开发指南
+## � 开发指南
 
 ### 扩展 API 接口
 
@@ -379,7 +458,8 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ## 📚 相关文档
 
-- [客户端使用说明](ocr_client使用说明.md) - Python 客户端详细使用指南
+- [客户端使用说明](ocr_client使用说明.md) - Umi-OCR Python 客户端详细使用指南
+- [PaddleOCR集成说明](PaddleOCR集成说明.md) - PaddleOCR 集成详细说明和使用指南
 - [Umi-OCR API 文档](Umi-api文档.md) - 原始 OCR API 参考
 - [Swagger API 文档](http://localhost:8000/docs) - 交互式 API 文档
 
