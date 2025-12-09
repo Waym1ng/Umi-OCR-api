@@ -81,11 +81,13 @@ async def redirect_to_test_page():
 @app.post("/ocr/recognize", response_model=ImageUploadResponse)
 async def recognize_uploaded_image(
     file: UploadFile = File(..., description="要识别的图片文件"),
+    ocr_engine: str = Form("umi_ocr", alias="ocr.engine"),
     ocr_language: str = Form(None, alias="ocr.language"),
     ocr_cls: bool = Form(None, alias="ocr.cls"),
     ocr_limit_side_len: int = Form(None, alias="ocr.limit_side_len"),
     tbpu_parser: str = Form(None, alias="tbpu.parser"),
-    data_format: str = Form("dict", alias="data.format")
+    data_format: str = Form("dict", alias="data.format"),
+    paddleocr_device: str = Form("gpu", alias="paddleocr.device")
 ):
     """
     通过上传图片文件进行OCR识别
@@ -110,17 +112,19 @@ async def recognize_uploaded_image(
         
         # 构建OCR选项
         options = OCROptions(
+            ocr_engine=ocr_engine,
             ocr_language=ocr_language,
             ocr_cls=ocr_cls,
             ocr_limit_side_len=ocr_limit_side_len,
             tbpu_parser=tbpu_parser,
-            data_format=data_format
+            data_format=data_format,
+            paddleocr_device=paddleocr_device
         )
         
         # 创建OCR请求
         ocr_request = OCRRequest(
             base64=base64_image,
-            options=options if any([ocr_language, ocr_cls, ocr_limit_side_len, tbpu_parser, data_format != "dict"]) else None
+            options=options if any([ocr_engine != "umi_ocr", ocr_language, ocr_cls, ocr_limit_side_len, tbpu_parser, data_format != "dict", paddleocr_device != "gpu"]) else None
         )
         
         # 调用OCR服务

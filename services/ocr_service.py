@@ -2,13 +2,14 @@ import json
 import requests
 import logging
 from typing import Dict, Any, Optional
-from models.ocr_models import OCRRequest, OCRResponse, OCROptions, OCRTextBlock
+from models.ocr_models import OCRRequest, OCRResponse, OCROptions, OCRTextBlock, OCREngine
+from services.paddleocr_service import paddleocr_service
 
 logger = logging.getLogger(__name__)
 
 
 class OCRService:
-    """OCR服务调用类"""
+    """OCR服务调用类，支持多引擎"""
     
     def __init__(self, ocr_url: str = "http://127.0.0.1:1224/api/ocr"):
         self.ocr_url = ocr_url
@@ -16,7 +17,7 @@ class OCRService:
     
     async def recognize_image(self, request: OCRRequest) -> OCRResponse:
         """
-        调用OCR服务进行图片识别
+        调用OCR服务进行图片识别，支持多引擎
         
         Args:
             request: OCR请求对象
@@ -27,6 +28,54 @@ class OCRService:
         Raises:
             Exception: OCR服务调用失败时
         """
+        # 确定使用的OCR引擎
+        engine = OCREngine.UMI_OCR  # 默认使用Umi-OCR
+        if request.options and request.options.ocr_engine:
+            engine = request.options.ocr_engine
+        
+        logger.info(f"使用OCR引擎: {engine}")
+        
+        # 根据引擎类型调用相应的服务
+        if engine == OCREngine.PADDLEOCR:
+            return await self._recognize_with_paddleocr(request)
+        else:
+            return await self._recognize_with_umi_ocr(request)
+    
+    async def _recognize_with_paddleocr(self, request: OCRRequest) -> OCRResponse:
+        """使用PaddleOCR进行识别"""
+        try:
+            # 设置PaddleOCR设备类型
+            if request.options and request.options.paddleocr_device:
+                # 重新初始化PaddleOCR服务以使用指定设备
+                global paddleocr_service
+                if paddleocr_service.device != request.options.paddleocr_device:
+                    logger.info(f"重新初始化PaddleOCR，使用设备: {request.options.paddleocr_device}")
+                    from services.paddleocr_service import PaddleOCRService
+                    paddleocr_service = PaddleOCRService(device=request.options.paddleocr_device)
+            
+            # 调用PaddleOCR服务
+            result = await paddleocr_service.recognize_image(request.base64)
+            
+            # 如果请求的是纯文本格式且识别成功，转换为纯文本
+            if (request.options and request.options.data_format and 
+                request.options.data_format.value == "text" and result.code == 100):
+                if isinstance(result.data, list):
+                    merged_text = " ".join([block.text for block in result.data])
+                    result.data = merged_text
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"PaddleOCR识别失败: {e}")
+            return OCRResponse(
+                code=200,
+                data=f"PaddleOCR识别失败: {str(e)}",
+                time=0.0,
+                timestamp=0.0
+            )
+    
+    async def _recognize_with_umi_ocr(self, request: OCRRequest) -> OCRResponse:
+        """使用Umi-OCR进行识别"""
         try:
             # 构建请求数据
             payload = {
@@ -39,7 +88,7 @@ class OCRService:
                 if options_dict:
                     payload["options"] = options_dict
             
-            logger.info(f"调用OCR服务: {self.ocr_url}")
+            logger.info(f"调用Umi-OCR服务: {self.ocr_url}")
             logger.debug(f"请求数据: base64长度={len(request.base64)}, options={payload.get('options', {})}")
             
             # 发送请求
@@ -55,25 +104,25 @@ class OCRService:
             
             # 解析响应
             result_dict = response.json()
-            logger.info(f"OCR服务响应成功，状态码: {result_dict.get('code')}")
+            logger.info(f"Umi-OCR服务响应成功，状态码: {result_dict.get('code')}")
             
             # 转换为OCRResponse对象
             return self._convert_response(result_dict)
             
         except requests.exceptions.Timeout:
-            logger.error("OCR服务请求超时")
+            logger.error("Umi-OCR服务请求超时")
             raise Exception("OCR服务请求超时")
         except requests.exceptions.ConnectionError:
-            logger.error("无法连接到OCR服务")
+            logger.error("无法连接到Umi-OCR服务")
             raise Exception("无法连接到OCR服务，请确保OCR服务正在运行")
         except requests.exceptions.HTTPError as e:
-            logger.error(f"OCR服务HTTP错误: {e}")
+            logger.error(f"Umi-OCR服务HTTP错误: {e}")
             raise Exception(f"OCR服务HTTP错误: {e}")
         except json.JSONDecodeError as e:
-            logger.error(f"OCR服务响应解析失败: {e}")
+            logger.error(f"Umi-OCR服务响应解析失败: {e}")
             raise Exception(f"OCR服务响应格式错误: {e}")
         except Exception as e:
-            logger.error(f"OCR服务调用失败: {e}")
+            logger.error(f"Umi-OCR服务调用失败: {e}")
             raise Exception(f"OCR识别失败: {e}")
     
     def _convert_options_to_dict(self, options: OCROptions) -> Dict[str, Any]:

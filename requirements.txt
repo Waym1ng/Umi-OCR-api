@@ -3,3 +3,6 @@ uvicorn
 python-multipart
 requests
 pydantic
+paddleocr
+pillow
+numpy

@@ -8,14 +8,21 @@ class OCRDataFormat(str, Enum):
     TEXT = "text"
 
 
+class OCREngine(str, Enum):
+    UMI_OCR = "umi_ocr"
+    PADDLEOCR = "paddleocr"
+
+
 class OCROptions(BaseModel):
     """OCR识别选项"""
+    ocr_engine: Optional[OCREngine] = Field(OCREngine.UMI_OCR, alias="ocr.engine")
     ocr_language: Optional[str] = Field(None, alias="ocr.language")
     ocr_cls: Optional[bool] = Field(None, alias="ocr.cls")
     ocr_limit_side_len: Optional[int] = Field(None, alias="ocr.limit_side_len")
     tbpu_parser: Optional[str] = Field(None, alias="tbpu.parser")
     tbpu_ignoreArea: Optional[List[List[List[int]]]] = Field(None, alias="tbpu.ignoreArea")
     data_format: Optional[OCRDataFormat] = Field(OCRDataFormat.DICT, alias="data.format")
+    paddleocr_device: Optional[str] = Field("gpu", alias="paddleocr.device")
 
 
 class OCRRequest(BaseModel):

@@ -188,6 +188,7 @@
         <div class="tabs">
             <button class="tab active" onclick="switchTab('upload')">📁 文件上传</button>
             <button class="tab" onclick="switchTab('base64')">📝 Base64上传</button>
+            <button class="tab" onclick="switchTab('paddleocr')">🔧 PaddleOCR测试</button>
         </div>
         
         <!-- 文件上传测试 -->
@@ -259,6 +260,49 @@
                 <span class="loading" id="base64Loading">正在处理中...</span>
                 
                 <div id="base64Result" class="result" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <!-- PaddleOCR测试 -->
+        <div id="paddleocr-tab" class="tab-content">
+            <div class="test-section">
+                <h2>🔧 PaddleOCR专项测试</h2>
+                
+                <div class="form-group">
+                    <label for="paddleocrImageFile">选择图片文件：</label>
+                    <input type="file" id="paddleocrImageFile" accept="image/*" onchange="previewPaddleOCRImage(this)">
+                    <img id="paddleocrImagePreview" class="image-preview" style="display: none;">
+                </div>
+                
+                <div class="form-group">
+                    <label for="paddleocrDevice">计算设备：</label>
+                    <select id="paddleocrDevice">
+                        <option value="gpu">GPU (推荐)</option>
+                        <option value="cpu">CPU</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="paddleocrFormat">返回格式：</label>
+                    <select id="paddleocrFormat">
+                        <option value="dict">详细格式 (dict)</option>
+                        <option value="text">纯文本 (text)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="paddleocrBase64Input">Base64图片数据：</label>
+                    <textarea id="paddleocrBase64Input" placeholder="请输入base64编码的图片数据（不需要data:image前缀）"></textarea>
+                </div>
+                
+                <button onclick="testPaddleOCRFileUpload()">🚀 文件识别</button>
+                <button onclick="testPaddleOCRBase64Upload()">📝 Base64识别</button>
+                <button onclick="loadPaddleOCRSampleImage()">📷 加载示例图片</button>
+                <button onclick="compareEngines()">⚡ 引擎对比</button>
+                <span class="loading" id="paddleocrLoading">正在处理中...</span>
+                
+                <div id="paddleocrResult" class="result" style="display: none;"></div>
+                <div id="compareResult" class="result" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -468,6 +512,214 @@
                 resultDiv.className = 'result error';
                 resultDiv.textContent = `请求失败: ${error.message}`;
                 resultDiv.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // PaddleOCR图片预览
+        function previewPaddleOCRImage(input) {
+            const preview = document.getElementById('paddleocrImagePreview');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        // PaddleOCR文件上传测试
+        async function testPaddleOCRFileUpload() {
+            const fileInput = document.getElementById('paddleocrImageFile');
+            const device = document.getElementById('paddleocrDevice').value;
+            const format = document.getElementById('paddleocrFormat').value;
+            const loading = document.getElementById('paddleocrLoading');
+            const resultDiv = document.getElementById('paddleocrResult');
+            
+            if (!fileInput.files[0]) {
+                alert('请选择图片文件');
+                return;
+            }
+            
+            loading.style.display = 'inline';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('ocr.engine', 'paddleocr');
+                formData.append('paddleocr.device', device);
+                formData.append('data.format', format);
+                
+                const response = await fetch(`${API_BASE}/ocr/recognize`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                let data;
+                let displayText;
+                
+                if (format === 'text' && response.ok) {
+                    data = await response.text();
+                    displayText = data;
+                } else {
+                    data = await response.json();
+                    displayText = JSON.stringify(data, null, 2);
+                }
+                
+                resultDiv.className = `result ${response.ok ? 'success' : 'error'}`;
+                resultDiv.textContent = displayText;
+                resultDiv.style.display = 'block';
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `请求失败: ${error.message}`;
+                resultDiv.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // PaddleOCR Base64上传测试
+        async function testPaddleOCRBase64Upload() {
+            const base64Input = document.getElementById('paddleocrBase64Input');
+            const device = document.getElementById('paddleocrDevice').value;
+            const format = document.getElementById('paddleocrFormat').value;
+            const loading = document.getElementById('paddleocrLoading');
+            const resultDiv = document.getElementById('paddleocrResult');
+            
+            if (!base64Input.value.trim()) {
+                alert('请输入Base64图片数据');
+                return;
+            }
+            
+            loading.style.display = 'inline';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const requestData = {
+                    base64: base64Input.value.trim(),
+                    options: {
+                        'ocr.engine': 'paddleocr',
+                        'paddleocr.device': device,
+                        'data.format': format
+                    }
+                };
+                
+                const response = await fetch(`${API_BASE}/ocr/recognize/base64`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                let data;
+                let displayText;
+                
+                if (format === 'text' && response.ok) {
+                    data = await response.text();
+                    displayText = data;
+                } else {
+                    data = await response.json();
+                    displayText = JSON.stringify(data, null, 2);
+                }
+                
+                resultDiv.className = `result ${response.ok ? 'success' : 'error'}`;
+                resultDiv.textContent = displayText;
+                resultDiv.style.display = 'block';
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `请求失败: ${error.message}`;
+                resultDiv.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // 加载PaddleOCR示例图片
+        function loadPaddleOCRSampleImage() {
+            const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+            document.getElementById('paddleocrBase64Input').value = sampleBase64;
+        }
+        
+        // 引擎对比测试
+        async function compareEngines() {
+            const fileInput = document.getElementById('paddleocrImageFile');
+            const device = document.getElementById('paddleocrDevice').value;
+            const format = document.getElementById('paddleocrFormat').value;
+            const loading = document.getElementById('paddleocrLoading');
+            const compareDiv = document.getElementById('compareResult');
+            
+            if (!fileInput.files[0]) {
+                alert('请选择图片文件进行对比测试');
+                return;
+            }
+            
+            loading.style.display = 'inline';
+            compareDiv.style.display = 'none';
+            
+            try {
+                // 读取文件为base64
+                const file = fileInput.files[0];
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const result = reader.result.split(',')[1]; // 移除data:image前缀
+                        resolve(result);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+                
+                // 同时测试两个引擎
+                const [umiResult, paddleResult] = await Promise.all([
+                    // Umi-OCR测试
+                    fetch(`${API_BASE}/ocr/recognize/base64`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            base64: base64,
+                            options: { 'data.format': format }
+                        })
+                    }).then(res => format === 'text' && res.ok ? res.text() : res.json()),
+                    
+                    // PaddleOCR测试
+                    fetch(`${API_BASE}/ocr/recognize/base64`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            base64: base64,
+                            options: {
+                                'ocr.engine': 'paddleocr',
+                                'paddleocr.device': device,
+                                'data.format': format
+                            }
+                        })
+                    }).then(res => format === 'text' && res.ok ? res.text() : res.json())
+                ]);
+                
+                // 格式化对比结果
+                const comparison = {
+                    图片文件: file.name,
+                    文件大小: `${(file.size / 1024).toFixed(2)} KB`,
+                    返回格式: format,
+                    Umi_OCR结果: umiResult,
+                    PaddleOCR结果: paddleResult,
+                    PaddleOCR设备: device
+                };
+                
+                compareDiv.className = 'result success';
+                compareDiv.textContent = JSON.stringify(comparison, null, 2);
+                compareDiv.style.display = 'block';
+                
+            } catch (error) {
+                compareDiv.className = 'result error';
+                compareDiv.textContent = `对比测试失败: ${error.message}`;
+                compareDiv.style.display = 'block';
             } finally {
                 loading.style.display = 'none';
             }
