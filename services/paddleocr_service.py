@@ -9,6 +9,39 @@ from models.ocr_models import OCRResponse, OCRTextBlock
 logger = logging.getLogger(__name__)
 
 
+def _configure_paddleocr_logging():
+    """配置PaddleOCR的日志，防止覆盖应用日志"""
+    # 设置PaddleOCR相关的日志级别为WARNING，减少输出噪音
+    paddleocr_loggers = [
+        'paddleocr',
+        'paddle',
+        'ppocr',
+        'paddle.utils',
+        'paddleocr.tools'
+    ]
+    
+    for logger_name in paddleocr_loggers:
+        try:
+            paddle_logger = logging.getLogger(logger_name)
+            paddle_logger.setLevel(logging.WARNING)
+            # 防止日志传播到根记录器
+            paddle_logger.propagate = False
+        except:
+            pass
+    
+    # 确保根记录器的格式正确
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        # 如果没有处理器，添加一个控制台处理器
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        root_logger.addHandler(handler)
+        root_logger.setLevel(logging.INFO)
+
+
 class PaddleOCRService:
     """PaddleOCR服务类"""
     
@@ -26,15 +59,28 @@ class PaddleOCRService:
     def _initialize_ocr(self):
         """初始化PaddleOCR实例"""
         try:
+            # 在初始化PaddleOCR前配置日志
+            _configure_paddleocr_logging()
+            
             from paddleocr import PaddleOCR
+            
+            # 临时设置环境变量来控制PaddleOCR的日志
+            import os
+            os.environ['FLAGS_logtostderr'] = '0'  # 禁用PaddlePaddle的日志输出
+            os.environ['FLAGS_verbosity'] = '0'     # 设置详细级别为0
             
             self.ocr = PaddleOCR(
                 use_doc_orientation_classify=False,
                 use_doc_unwarping=False,
                 use_textline_orientation=False,
-                device=self.device
+                device=self.device,
+                det_limit_side_len=1024*8,
             )
             logger.info(f"PaddleOCR初始化成功，使用设备: {self.device}")
+            
+            # 初始化后重新配置应用日志，确保格式正确
+            _configure_paddleocr_logging()
+            
         except ImportError:
             logger.error("PaddleOCR未安装，请运行: pip install paddleocr")
             raise Exception("PaddleOCR未安装")

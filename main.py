@@ -1,4 +1,5 @@
 import logging
+import logging.handlers
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 
@@ -17,12 +18,59 @@ from models.ocr_models import (
 from services.ocr_service import ocr_service
 from utils.image_utils import image_to_base64, validate_image_file, clean_base64_string
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+
+def configure_application_logging():
+    """配置应用程序日志，防止被其他库覆盖"""
+    # 清除现有的根日志处理器
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # 创建控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    
+    # 设置日志格式
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    console_handler.setFormatter(formatter)
+    
+    # 配置根日志记录器
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(console_handler)
+    
+    # 配置第三方库的日志级别
+    third_party_loggers = [
+        'uvicorn',
+        'uvicorn.access',
+        'uvicorn.error',
+        'fastapi',
+        'paddleocr',
+        'paddle',
+        'ppocr',
+        'requests',
+        'urllib3'
+    ]
+    
+    for logger_name in third_party_loggers:
+        try:
+            third_party_logger = logging.getLogger(logger_name)
+            third_party_logger.setLevel(logging.WARNING)
+        except:
+            pass
+    
+    # 配置应用程序专用日志记录器
+    app_logger = logging.getLogger(__name__)
+    app_logger.setLevel(logging.INFO)
+    
+    return app_logger
+
+
+# 配置应用程序日志
+logger = configure_application_logging()
+logger.info("应用程序日志配置完成")
 
 
 @asynccontextmanager

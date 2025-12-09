@@ -68,13 +68,18 @@ def start_server(host="0.0.0.0", port=8000, reload=False):
     
     try:
         import uvicorn
-        uvicorn.run(
-            "main:app",
-            host=host,
-            port=port,
-            reload=reload,
-            log_level="info"
-        )
+        
+        # 配置uvicorn日志，减少噪音
+        uvicorn_config = {
+            "app": "main:app",
+            "host": host,
+            "port": port,
+            "reload": reload,
+            "log_level": "warning",  # 降低uvicorn的日志级别
+            "access_log": False,     # 禁用访问日志
+        }
+        
+        uvicorn.run(**uvicorn_config)
     except KeyboardInterrupt:
         print("\n服务已停止")
     except Exception as e:
