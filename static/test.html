@@ -296,6 +296,7 @@
                 </div>
                 
                 <button onclick="testPaddleOCRFileUpload()">🚀 文件识别</button>
+                <button onclick="convertImageToBase64()">🔄 图片转Base64</button>
                 <button onclick="testPaddleOCRBase64Upload()">📝 Base64识别</button>
                 <button onclick="loadPaddleOCRSampleImage()">📷 加载示例图片</button>
                 <button onclick="compareEngines()">⚡ 引擎对比</button>
@@ -636,6 +637,58 @@
                 resultDiv.textContent = `请求失败: ${error.message}`;
                 resultDiv.style.display = 'block';
             } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // 图片转Base64功能
+        function convertImageToBase64() {
+            const fileInput = document.getElementById('paddleocrImageFile');
+            const base64Input = document.getElementById('paddleocrBase64Input');
+            const loading = document.getElementById('paddleocrLoading');
+            const resultDiv = document.getElementById('paddleocrResult');
+            
+            if (!fileInput.files[0]) {
+                alert('请先选择图片文件');
+                return;
+            }
+            
+            loading.style.display = 'inline';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    // 获取完整的data URL并移除前缀，只保留纯base64数据
+                    const dataUrl = e.target.result;
+                    const base64Data = dataUrl.split(',')[1]; // 移除data:image/...;base64,前缀
+                    
+                    // 填充到base64输入框
+                    base64Input.value = base64Data;
+                    
+                    // 显示成功提示
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ 图片转换成功！\n文件名: ${file.name}\n文件大小: ${(file.size / 1024).toFixed(2)} KB\nBase64数据已填充到下方输入框，可直接用于Base64识别测试。`;
+                    resultDiv.style.display = 'block';
+                    
+                    loading.style.display = 'none';
+                };
+                
+                reader.onerror = function() {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '❌ 图片读取失败，请重试';
+                    resultDiv.style.display = 'block';
+                    loading.style.display = 'none';
+                };
+                
+                reader.readAsDataURL(file);
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 转换失败: ${error.message}`;
+                resultDiv.style.display = 'block';
                 loading.style.display = 'none';
             }
         }
